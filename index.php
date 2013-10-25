@@ -1,29 +1,30 @@
 <?php
 
-//Пользователь и пароль для подключения к Zabbix API
-$user = 'apiuser';
-$pass = 'apipass';
-$url = 'http://monitoring.lan/zabbix/';
+require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . "config.inc.php");
+// User from config for connection with Zabbix API
+$user = ZABBIX_USER;
+$pass = ZABBIX_PASS;
+$url = ZABBIX_URL;
 
 /*
  * Авторизация на самом скрипте
  * Пользователи: имя, пароль, группа узлов, показывать карту?
- */ 
+ */
 $users = array(
-			'admin' => array('pass' => 'adminpass', 'group' => 1, 'show_map' => 1),
+			'admin' => array('pass' => 'adminpass', 'group' => 7, 'show_map' => 0),
 			'user' => array('pass' => 'userpass', 'group' => 2, 'show_map' => 0)
 		);
-		
+
 // URL карты http://логин:пароль@хост/путь. Логин и пароль указываются в get_map.php
-$map_URL = "http://map:mappass@monitoring.lan/zabbix/get_map.php";
-		
-if(empty($users[$_SERVER['PHP_AUTH_USER']]) || $_SERVER['PHP_AUTH_PW'] != $users[$_SERVER['PHP_AUTH_USER']]['pass']) 
+$map_URL = "https://map:mappass@zabbix.jayhosting.local/zabbix_ports/get_map.php";
+
+if(empty($users[$_SERVER['PHP_AUTH_USER']]) || $_SERVER['PHP_AUTH_PW'] != $users[$_SERVER['PHP_AUTH_USER']]['pass'])
 {
     header('WWW-Authenticate: Basic realm=" @( * O * )@ "');
     header('HTTP/1.0 401 Unauthorized');
     echo 'who are you?';
     exit;
-} 
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -135,7 +136,7 @@ $(function() {
 			$(".port").css('font-size', '8px');
 		}
 	});
-	
+
 	$('input[name=position]').change(function() {
 		if($('input[name=position]:checked').val() == 'vertical')
 		{
@@ -146,15 +147,15 @@ $(function() {
 			$(".device").css('float', 'left');
 		}
 	});
-    
+
     $('input[name=refresh]').change(function() {
         if($('input[name=refresh]').is(':checked') == true) refresh();
     });
-	
+
 	$('#map_switch').click(function() {
 		$('#map').toggle();
 	});
-	
+
 	$('input[name=size]').change();
 	$('input[name=position]').change();
     $('input[name=refresh]').change();
@@ -171,17 +172,18 @@ function refresh()
         cur = 0;
         //console.log(cur);
 		$('#map').attr('src', '<?php echo $map_URL; ?>?' + Math.random());
-        setTimeout(refresh, 5000);
+        //setTimeout(refresh, 5000);
+        setTimeout(refresh, 30000);
         return;
     }
-    
-    var hostId = hostids[cur];    
+
+    var hostId = hostids[cur];
     cur++;
     console.log(cur);
-    
+
     $('#' + hostId + '_upd').removeClass('lg lr');
     $('#' + hostId + '_upd').addClass('ly');
-        
+
     jQuery.ajax({
         type: "POST",
         url: "ports_ajax.php",
@@ -201,7 +203,7 @@ function refresh()
             $('#' + $(this).attr('id') + '_upd').removeClass('ly');
             $('#' + $(this).attr('id') + '_upd').addClass('lr');
             refresh();
-        }    
+        }
     });
 }
 </script>
@@ -214,7 +216,7 @@ function refresh()
 <?php } ?>
 Размер: <input type="radio" id="small_size" name="size" value="small"><label for="small_size">мелко</label>
 <input type="radio" id="big_size" name="size" value="big" checked><label for="big_size">крупно</label><br>
-Расположение: <input type="radio" id="vertical_pos" name="position" value="vertical" checked><label for="vertical_pos">вертикально</label> 
+Расположение: <input type="radio" id="vertical_pos" name="position" value="vertical" checked><label for="vertical_pos">вертикально</label>
 <input type="radio" id="pyle_pos" name="position" value="pyle"><label for="pyle">в кучу</label><br>
 <input type="checkbox" value="refresh" name="refresh" id="refresh" checked><label for="refresh">обновлять</label>
 
@@ -226,7 +228,7 @@ ZabbixAPI::debugEnabled(TRUE);
 $zlogin = ZabbixAPI::login($url, $user, $pass);
 if($zlogin)
 {
-    $hosts = ZabbixAPI::fetch_array('host','get',array('output'=>'extend', 'groupids'=>array($users[$_SERVER['PHP_AUTH_USER']]['group']), 'monitored'=>1, 'sortfield'=>'host'));  
+    $hosts = ZabbixAPI::fetch_array('host','get',array('output'=>'extend', 'groupids'=>array($users[$_SERVER['PHP_AUTH_USER']]['group']), 'monitored'=>1, 'sortfield'=>'host'));
     $hostids = array();
     //print_r($hosts);
     foreach($hosts as $k => $host)
@@ -234,36 +236,42 @@ if($zlogin)
 		$host_html = '';
 		$host_html .= "<div class=\"device\" id=\"{$host['hostid']}\"><div class=\"name_label\">{$host['host']}</div>";
         $hostid = $host['hostid'];
-        
+
         $items = ZabbixAPI::fetch_array('item','get',array('hostids'=>array($hostid), 'output'=>'extend')); //print_r($items);
-		$has_ports = false;		
+		$has_ports = false;
+
         foreach($items as $item)
         {
-            if(preg_match('/Status port ([GF]E )?([0-9]+)/', $item['name'], $regs)) $has_ports = true;
-        }   
-        
-        
+            //if(preg_match('/Status port ([GF]E )?([0-9]+)/', $item['name'], $regs)) $has_ports = true;
+            if(preg_match('/Operational status of interface/', $item['name'], $regs)) $has_ports = true;
+//echo "<pre>";
+//print_r($item);
+//echo "</pre></br>";
+
+        }
+
         $indicators_html = "snmp<div class=\"led " . ($host['snmp_available'] == 2 ? ' lr' : ' lg') . "\"></div> ";
         $indicators_html .= "upd<div id=\"{$host['hostid']}[upd]\" class=\"led ly\"></div> ";
-        
+
         $host_html .= "<div class=\"indicators\">$indicators_html</div>";
-        
+
         $tooltip_str = '';
-        
+
         if($host['snmp_available'] == 2)
         {
             $tooltip_str .= "<em>Error: {$host['snmp_error']}</em><br>";
         }
-        
+
         $tooltip_str .= "IP: {$host['ip']}<br>" .
-                        "DNS: {$host['dns']}";   
-        $host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\*\r\n$('#{$host['hostid']}').tooltip();*\\r\n</script>\r\n"; 
+                        "DNS: {$host['dns']}";
+        //$host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\*\r\n$('#{$host['hostid']}').tooltip();*\\r\n</script>\r\n";
+        $host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\r\n</script>\r\n";
 		$host_html .= "<br>";
-		
+
         $host_html .= '<div class="port"> </div>';
-        
+
 		$host_html .= "</div><br>\r\n\r\n";
-        
+
         if($has_ports)
         {
             echo $host_html;
@@ -271,11 +279,12 @@ if($zlogin)
         }
 
 		//if($k == 3)	break;
-		
+
     }
-    
-    $hostids = join(',', $hostids);
-    echo "\r\n<script>\r\nvar hostids = new Array($hostids);\r\n</script>"; 
+
+    // $hostids = join(',', $hostids);
+    //echo "\r\n<script>\r\nvar hostids = new Array($hostids);\r\n</script>";
+    echo "\r\n<script>\r\nvar hostids = ".json_encode($hostids).";\r\n</script>";
 }
 else echo "Нет соединения с zabbix";
 

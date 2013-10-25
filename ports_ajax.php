@@ -1,8 +1,10 @@
 <?php
-//Пользователь и пароль для подключения к Zabbix API
-$user = 'apiuser';
-$pass = 'apipass';
-$url = 'http://monitoring.lan/zabbix/';
+
+require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . "config.inc.php");
+// User from config for connection with Zabbix API
+$user = ZABBIX_USER;
+$pass = ZABBIX_PASS;
+$url = ZABBIX_URL;
 
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
@@ -11,24 +13,28 @@ if(empty($_REQUEST['hostid']))
     avost();
 }
 
+function get_item_key($item) {
+    return substr(strrchr($item['snmp_oid'], "."), 1);
+}
+
 require_once("ZabbixAPI.class.php");
 ZabbixAPI::debugEnabled(TRUE);
 $zlogin = ZabbixAPI::login($url,$user,$pass);
 if($zlogin)
 {
-    $hosts = ZabbixAPI::fetch_array('host','get',array('output'=>'extend', 'hostids'=>array($_REQUEST['hostid']), 'monitored'=>1));  
+    $hosts = ZabbixAPI::fetch_array('host','get',array('output'=>'extend', 'hostids'=>array($_REQUEST['hostid']), 'monitored'=>1));
 
     $host = $hosts[0];
-    
+
     if(!$host) avost();
-	
-	$host_ifaces = ZabbixAPI::fetch_array('hostinterface','get',array('output'=>'extend', 'hostids'=>array($_REQUEST['hostid']), 'monitored'=>1));  
+
+	$host_ifaces = ZabbixAPI::fetch_array('hostinterface','get',array('output'=>'extend', 'hostids'=>array($_REQUEST['hostid']), 'monitored'=>1));
 	$host_iface = $host_ifaces[0];
-    
+
     $host_html = '';
     $host_html .= "<div class=\"name_label\">{$host['host']}</div>";
     $hostid = $host['hostid'];
-    $items = ZabbixAPI::fetch_array('item','get',array('hostids'=>array($hostid), 'output'=>'extend', 'monitored'=>1)); 
+    $items = ZabbixAPI::fetch_array('item','get',array('hostids'=>array($hostid), 'output'=>'extend', 'monitored'=>1));
     if(!$items) avost();
     $has_ports = false;
     $ports_info = array();
@@ -37,51 +43,62 @@ if($zlogin)
     $temperature = false;
     $memory = false;
     $cpu = false;
-    
-    $catch_keys = array('ifInBroadcastPkts', 'ifOutBroadcastPkts', 'ifInOctets', 'ifOutOctets', 'ifInErrors', 'ifOutErrors', 'ifOperStatus');
+
+    $catch_keys = array('ifAlias', 'ifInBroadcastPkts', 'ifOutBroadcastPkts', 'ifInOctets', 'ifOutOctets', 'ifInErrors', 'ifOutErrors', 'ifOperStatus', 'ifAdminStatus', 'ifLastChange');
     //print_r($items);
-    foreach($items as $item)
+    foreach($items as $itemkey => $item)
     {
         $regs = array();
-        
+
         if($item['key_'] == 'temperatureStatus') $temperature = $item['lastvalue'];
         if($item['key_'] == 'cpuUsage') $cpu = $item['lastvalue'];
         if($item['key_'] == 'Uptime') $uptime = $item['lastvalue'];
         if($item['key_'] == 'memoryUsage') $memory = $item['lastvalue'];
-        
+
         foreach($catch_keys as $key)
-        {            
-            if(strstr($item['key_'], $key)) 
+        {
+            if(strstr($item['snmp_oid'], $key))
             {
-                $ports_info[substr(strrchr($item['key_'], "."), 1)][$key] = $item;
+                $ports_info[get_item_key($item)][$key] = $item;
             }
         }
-        
-        if(preg_match('/Status port ([GF]E )?([0-9]+)/', $item['name'], $regs))
+
+        //if(preg_match('/Status port ([GF]E )?([0-9]+)/', $item['name'], $regs))
+//echo "<pre>";
+//echo $itemkey;
+//print_r($item);
+//print_r($ports_info);
+//echo "</pre>";
+        // if(preg_match('/Operational status of interface/', $item['name'], $regs))
+        if(preg_match('/ifOperStatus\[([a-zA-Z]*).*\/([0-9]+)\]/', $item['key_'], $regs))
         {
-            if($regs[1] == 'GE ') $ports_info[substr(strrchr($item['key_'], "."), 1)]['speed'] = 'ge';
-            else $ports_info[substr(strrchr($item['key_'], "."), 1)]['speed'] = 'fe';
-            $ports_info[substr(strrchr($item['key_'], "."), 1)]['number'] = $regs[2];
+            if($regs[1] == 'GE ' || $regs[1] == 'GigabitEthernet' ) $ports_info[get_item_key($item)]['speed'] = 'ge';
+            else $ports_info[get_item_key($item)]['speed'] = 'fe';
+
+            $ports_info[get_item_key($item)]['number'] = $regs[2];
             $has_ports = true;
         }
     }
-    
+//echo "<pre>";
+//print_r($ports_info);
+//echo "</pre>";
+
     foreach($ports_info as $k => $port) if(empty($port['ifOperStatus']) || empty($port['speed'])) unset($ports_info[$k]);
-    
+
     $tooltip_str = '';
     if($uptime)
     {
-        $tooltip_str .= "Uptime: " . sprintf("%dd %02d:%02d", $uptime / 86400, $uptime % 86400 / 3600,  $uptime % 3600 / 60) . "\\r\\n";   
+        $tooltip_str .= "Uptime: " . sprintf("%dd %02d:%02d", $uptime / 86400, $uptime % 86400 / 3600,  $uptime % 3600 / 60) . "\\r\\n";
     }
-    
+
     if($host['snmp_available'] == 2)
     {
         $tooltip_str .= "<b>Error: " . strip_tags($host['snmp_error']) . "</b><br>";
     }
-    
+
     $tooltip_str .= "IP: {$host_iface['ip']}\\r\\n" .
-                    "DNS: {$host_iface['dns']}\\r\\n";   
-                    
+                    "DNS: {$host_iface['dns']}\\r\\n";
+
     $indicators_html = "snmp<div class=\"led " . ($host['snmp_available'] == 2 ? ' lr' : ' lg') . "\"></div> ";
     if($cpu !== false)
     {
@@ -91,19 +108,24 @@ if($zlogin)
     if($memory !== false) $tooltip_str .= "Memory: " . round($memory / 1048576) . " Mb\\r\\n";
     if($temperature !== false) $indicators_html .= "temp<div class=\"led " . ($temperature > 1 ? ' lr' : ' lg') . "\"></div> ";
     $indicators_html .= "upd<div id=\"{$host['hostid']}_upd\" class=\"led lg\"></div> ";
-    
+
     $host_html .= "<div class=\"indicators\">$indicators_html</div>";
-    
-    $host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\r\n</script>\r\n"; 
+
+    $host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\r\n</script>\r\n";
     $host_html .= "<br>";
-    
-    $keys_tooltip = array('Broadcast Rx' => 'ifInBroadcastPkts', 
+    if ($port['ifLastChange'])
+    {
+        $lastchange = sprintf("%dd %02d:%02d", $port['ifLastChange'] / 86400, $port['ifLastChange'] % 86400 / 3600,  $port['ifLastChange'] % 3600 / 60);
+    }
+    $keys_tooltip = array('ifAlias' => 'ifAlias',
+                        'LastChange' => 'ifLastChange',
+                        'Broadcast Rx' => 'ifInBroadcastPkts',
                         'Broadcast Tx' => 'ifOutBroadcastPkts',
                         'Traffic Rx' => 'ifInOctets',
-                        'Traffic Tx' => 'ifOutOctets', 
-                        'Errors Rx' => 'ifInErrors', 
+                        'Traffic Tx' => 'ifOutOctets',
+                        'Errors Rx' => 'ifInErrors',
                         'Errors Tx' => 'ifOutErrors');
-                        
+
     function cmp($a, $b)
     {
         if ($a['number'] == $b['number']) {
@@ -114,7 +136,7 @@ if($zlogin)
     //echo '<pre>';
    // print_r($ports_info);echo '</pre>';
     usort($ports_info, "cmp");
-    
+
 
     foreach($ports_speed as $speed)
     {
@@ -122,7 +144,7 @@ if($zlogin)
         {
             if($port_items['speed'] != $speed) continue;
             if($port_items['ifOperStatus']['lastvalue'] == '1') $port_status = 'up';
-            else $port_status = 'down';            
+            else $port_status = 'down';
             $host_html .= "<div class=\"port $port_status {$port_items['speed']}\"";
             $host_html_style = '';
             if($port_status == 'up')
@@ -131,7 +153,7 @@ if($zlogin)
                 {
                     $host_html_style .= "border-color: orange;";
                     //print_r($port_items);
-                }             
+                }
 
                 if(!empty($port_items['ifInOctets']) && !empty($port_items['ifOutOctets']))
                 {
@@ -143,18 +165,18 @@ if($zlogin)
             $tooltip_str = '';
             foreach($keys_tooltip as $title => $key)
             {
-                if(!empty($port_items[$key])) 
+                if(!empty($port_items[$key]))
                 {
                     //echo "$key<HR>";
                     //print_r($port_items[$key]);
                     $tooltip_str .= "$title: " . normalize(intval($port_items[$key]['lastvalue'])) . $port_items[$key]['units'] . " " . "\\r\\n";
                 }
             }
-            $host_html .= "<script>\r\n$('#{$port_items['ifOperStatus']['itemid']}').attr('title', '$tooltip_str');\r\n</script>\r\n"; 
-        }	
+            $host_html .= "<script>\r\n$('#{$port_items['ifOperStatus']['itemid']}').attr('title', '$tooltip_str');\r\n</script>\r\n";
+        }
     }
-    
-    if($has_ports) echo $host_html;			
+
+    if($has_ports) echo $host_html;
 }
 else
 {
@@ -173,7 +195,7 @@ function GYR_scale($x, $max)
 {
     if($x > $max) $x = $max;
     if($x / $max < 0.5) return sprintf("%02x", round($x / $max * 510)) . 'ff00';
-    else return 'ff' . sprintf("%02x", round(255 - ($x - $max * 0.5) / $max * 2 * 255)) . '00';    
+    else return 'ff' . sprintf("%02x", round(255 - ($x - $max * 0.5) / $max * 2 * 255)) . '00';
 }
 
 function GYR_scale_exp($x, $max)
@@ -189,13 +211,13 @@ function GYR_scale_exp($x, $max)
 function G_scale($x, $max)
 {
     if($x > $max) $x = $max;
-    return '00' . sprintf("%02x", round($x / $max * 128) + 127) . '00';    
+    return '00' . sprintf("%02x", round($x / $max * 128) + 127) . '00';
 }
 
 function Y_scale($x, $max)
 {
     if($x > $max) $x = $max;
-    return 'cc' . sprintf("%02x", round($x / $max * 128) + 127) . '00';    
+    return 'cc' . sprintf("%02x", round($x / $max * 128) + 127) . '00';
 }
 
 function avost()
