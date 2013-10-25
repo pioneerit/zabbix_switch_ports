@@ -13,10 +13,6 @@ if(empty($_REQUEST['hostid']))
     avost();
 }
 
-function get_item_key($item) {
-    return substr(strrchr($item['snmp_oid'], "."), 1);
-}
-
 require_once("ZabbixAPI.class.php");
 ZabbixAPI::debugEnabled(TRUE);
 $zlogin = ZabbixAPI::login($url,$user,$pass);
@@ -113,18 +109,15 @@ if($zlogin)
 
     $host_html .= "<script>\r\n$('#{$host['hostid']}').attr('title', '$tooltip_str');\r\n</script>\r\n";
     $host_html .= "<br>";
-    if ($port['ifLastChange'])
-    {
-        $lastchange = sprintf("%dd %02d:%02d", $port['ifLastChange'] / 86400, $port['ifLastChange'] % 86400 / 3600,  $port['ifLastChange'] % 3600 / 60);
-    }
-    $keys_tooltip = array('ifAlias' => 'ifAlias',
-                        'LastChange' => 'ifLastChange',
-                        'Broadcast Rx' => 'ifInBroadcastPkts',
+
+    $keys_for_normalize = array('Broadcast Rx' => 'ifInBroadcastPkts',
                         'Broadcast Tx' => 'ifOutBroadcastPkts',
                         'Traffic Rx' => 'ifInOctets',
                         'Traffic Tx' => 'ifOutOctets',
                         'Errors Rx' => 'ifInErrors',
                         'Errors Tx' => 'ifOutErrors');
+    $headers_keys = array('ifAlias' => 'ifAlias', 'LastChange' => 'ifLastChange');
+    $keys_tooltip = array_merge($headers_keys, $keys_for_normalize);
 
     function cmp($a, $b)
     {
@@ -163,7 +156,18 @@ if($zlogin)
 			if($host_html_style) $host_html .= " style=\"$host_html_style\"";
             $host_html .= " id=\"{$port_items['ifOperStatus']['itemid']}\">{$port_items['number']}</div>\r\n";
             $tooltip_str = '';
-            foreach($keys_tooltip as $title => $key)
+
+            if ($port['ifAlias'])
+            {
+                $tooltip_str .= "Alias: " . $port_items['ifAlias']['lastvalue'] . "\\r\\n";
+            }
+            if ($port['ifLastChange'])
+            {
+                //$lastchange = sprintf("%dd %02d:%02d", $port['ifLastChange'] / 86400, $port['ifLastChange'] % 86400 / 3600,  $port['ifLastChange'] % 3600 / 60);
+                $tooltip_str .= "LastChange: " . sprintf("%dd %02dh %02dm", $port_items['ifLastChange']['lastvalue'] / 86400, $port_items['ifLastChange']['lastvalue'] % 86400 / 3600,  $port_items['ifLastChange']['lastvalue'] % 3600 / 60)."\\r\\n";
+            }
+
+            foreach($keys_for_normalize as $title => $key)
             {
                 if(!empty($port_items[$key]))
                 {
@@ -181,6 +185,10 @@ if($zlogin)
 else
 {
     avost();
+}
+
+function get_item_key($item) {
+    return substr(strrchr($item['snmp_oid'], "."), 1);
 }
 
 function normalize($x, $dec=2)
