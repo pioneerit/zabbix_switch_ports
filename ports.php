@@ -17,72 +17,79 @@ $users = array(
         );
 
 // URL карты http://логин:пароль@хост/путь. Логин и пароль указываются в get_map.php
-$map_URL = "https://map:mappass@zabbix.jayhosting.local/zabbix_ports/get_map.php";
+$map_URL = "/zabbix_ports/get_map.php";
 
-// if(empty($users[$_SERVER['PHP_AUTH_USER']]) || $_SERVER['PHP_AUTH_PW'] != $users[$_SERVER['PHP_AUTH_USER']]['pass'])
-// {
-//     header('WWW-Authenticate: Basic realm=" @( * O * )@ "');
-//     header('HTTP/1.0 401 Unauthorized');
-//     echo 'who are you?';
-//     exit;
-// }
 require_once('include/config.inc.php');
 require_once('include/js.inc.php');
 require_once('include/hosts.inc.php');
 require_once('include/items.inc.php');
 require_once "switches.php";
+
 if (isset($_REQUEST['ajax']) && isset($_REQUEST['groupid']) && $_REQUEST['ajax']) {
     echo buildSwitches($_REQUEST['groupid']);
     exit;
 }
 
-// $page["title"]    = $ZabbixYaMap['city'];
-$page['file']     = basename(__FILE__);
-// $page['scripts']  = array('yamaps_functions_shared.js');
-$page['type']     = detect_page_type(PAGE_TYPE_HTML);
-// Detect YandexMaps Language
-// $page['yaLang'] = YaMapLanguage(CWebUser::$data['lang']);
-
 include_once('include/page_header.php');
 ?>
 <style>
 * {
-margin: 0;
-padding: 0;
-font-family: Verdana, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    font-family: Verdana, Arial, sans-serif;
 }
 
 .device {
-border: 3px double black;
-background-color: #666;
-padding: 3px;
-margin: 10px;
-color: white;
-font-size: 14px;
-float: left;
-cursor: help;
-display:-moz-inline-stack;
-display:inline-block;
-zoom:1;
-*display:inline;
+    border: 3px groove black;
+    background-color: #666;
+    padding: 3px;
+    margin: 10px;
+    color: white;
+    font-size: 14px;
+    float: left;
+    cursor: help;
+    display:-moz-inline-stack;
+    display:inline-block;
+    zoom:1;
+    *display:inline;
 }
 
 .port {
-padding: 1px;
-color: black;
-float: left;
-text-align: center;
-cursor: help;
-display:-moz-inline-stack;
-display:inline-block;
+    padding: 1px;
+    color: black;
+    float: left;
+    text-align: center;
+    cursor: help;
+    display:-moz-inline-stack;
+    display:inline-block;
+}
+
+.one {
+    -webkit-transform: rotate(-45deg);
+    -moz-transform: rotate(-45deg);
+    -o-transform: rotate(-45deg);
+    filter:progid:DXImageTransform.Microsoft.Matrix(M11='0.707', M12='0.707', M21='-0.707', M22='0.707', SizingMethod="auto expand");
+}
+
+.two {
+    -webkit-transform: rotate(45deg);
+    -moz-transform: rotate(45deg);
+    -o-transform: rotate(45deg);
+    filter:
+    progid:DXImageTransform.Microsoft.Matrix(M11='0.707', M12='0.707', M21='-0.707', M22='0.707', SizingMethod="auto expand");
+    progid:DXImageTransform.Microsoft.BasicImage(rotation=3);
+}
+
+.disable {
+    background-color: #ccc;
 }
 
 .up {
-background-color: #3f3;
+    background-color: #3f3;
 }
 
 .down {
-    background-color: #ccc;
+    background-color: #ff0;
 }
 
 .ge {

@@ -136,8 +136,14 @@ if($zlogin)
         foreach($ports_info as $k => $port_items)
         {
             if($port_items['speed'] != $speed) continue;
-            if($port_items['ifOperStatus']['lastvalue'] == '1') $port_status = 'up';
-            else $port_status = 'down';
+
+            if($port_items['ifAdminStatus']['lastvalue'] == '1')
+            {
+                if($port_items['ifOperStatus']['lastvalue'] == '1') $port_status = 'up';
+                else $port_status = 'down';
+            }
+            else $port_status = 'disable';
+
             $host_html .= "<div class=\"port $port_status {$port_items['speed']}\"";
             $host_html_style = '';
             if($port_status == 'up')
