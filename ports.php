@@ -64,22 +64,6 @@ include_once('include/page_header.php');
     display:inline-block;
 }
 
-.one {
-    -webkit-transform: rotate(-45deg);
-    -moz-transform: rotate(-45deg);
-    -o-transform: rotate(-45deg);
-    filter:progid:DXImageTransform.Microsoft.Matrix(M11='0.707', M12='0.707', M21='-0.707', M22='0.707', SizingMethod="auto expand");
-}
-
-.two {
-    -webkit-transform: rotate(45deg);
-    -moz-transform: rotate(45deg);
-    -o-transform: rotate(45deg);
-    filter:
-    progid:DXImageTransform.Microsoft.Matrix(M11='0.707', M12='0.707', M21='-0.707', M22='0.707', SizingMethod="auto expand");
-    progid:DXImageTransform.Microsoft.BasicImage(rotation=3);
-}
-
 .disable {
     background-color: #ccc;
 }
@@ -89,7 +73,7 @@ include_once('include/page_header.php');
 }
 
 .down {
-    background-color: #ff0;
+    background-color: lightsalmon;
 }
 
 .ge {
@@ -106,6 +90,15 @@ include_once('include/page_header.php');
     float: left;
     display:-moz-inline-stack;
     display:inline-block;
+}
+
+.alias_label {
+    -webkit-transform: rotate(-90deg);
+    -moz-transform: rotate(-90deg);
+    -o-transform: rotate(-90deg);
+    margin: 3px 1px 1px 1px;
+    border: 1px solid white;
+    background-color: #FDF98D;
 }
 
 .indicators {
@@ -246,7 +239,7 @@ size: <input type="radio" id="small_size" name="size" value="small"><label for="
 disposition: <input type="radio" id="vertical_pos" name="position" value="vertical" checked><label for="vertical_pos">vertical</label>
 <input type="radio" id="pyle_pos" name="position" value="pyle"><label for="pyle">pyle</label><br>
 <input type="checkbox" value="refresh" name="refresh" id="refresh" checked><label for="refresh">auto-refresh</label>
-<input type="input" value="30" name="refresh_time" id="refresh_time"></br>
+<input type="input" value="60" name="refresh_time" id="refresh_time"></br>
 <?php
 
 function selectHtml($name, $options, $value = 'value', $label = 'label')  {
